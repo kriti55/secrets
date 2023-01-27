@@ -2,9 +2,11 @@
 require('dotenv').config();
 const express = require("express");
 const bodyParser = require("body-parser");
-const ejs=require("ejs");
+const ejs = require("ejs");
 const mongoose = require('mongoose');
-const md5=require('md5');
+const bcrypt = require('bcrypt');
+const { maxBy } = require('lodash');
+const saltRounds = 10;
 
 
 const app = express();
@@ -19,52 +21,63 @@ mongoose.set('strictQuery', true);
 mongoose.connect('mongodb://127.0.0.1:27017/userDB');
 
 
-const userSchema=new mongoose.Schema({
-      email:String,
-      password:String 
+const userSchema = new mongoose.Schema({
+    email: String,
+    password: String
 });
 
 
 
 
-const User=new mongoose.model("User",userSchema);
+const User = new mongoose.model("User", userSchema);
 
-app.get("/",function(req,res){
+app.get("/", function (req, res) {
     res.render("home");
 });
 
-app.get("/login",function(req,res){
+app.get("/login", function (req, res) {
     res.render("login");
 });
 
-app.get("/register",function(req,res){
+app.get("/register", function (req, res) {
     res.render("register");
 });
 
 
 
-app.post("/register",function(req,res){
-    const newUser=new User({
-        email:req.body.username,
-        password:md5(req.body.password)
-    })
-    newUser.save(function(err){
-        if(err) res.send("Error registereing");
-        else res.render("secrets");
+app.post("/register", function (req, res) {
+
+    bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
+
+        const newUser = new User({
+            email: req.body.username,
+            password: hash
+        });
+        newUser.save(function (err) {
+            if (err) res.send("Error registereing");
+            else res.render("secrets");
+        });
     });
-})
+});
 
-app.post("/login",function(req,res){
-    User.findOne({email:req.body.username},function(err,result){
-        if(!err){
-            if(result) {
-                if(result.password===md5(req.body.password)){res.render("secrets");}
+app.post("/login", function (req, res) {
+    User.findOne({ email: req.body.username }, function (err, result) {
+        if (!err) {
+            if (result) {
+                bcrypt.compare(req.body.password, result.password, function (err, match) {
+
+                    if (match==true) { res.render("secrets"); }
+                    else res.send("Password Mismatched!!");
+
+                });
+            }
             else res.send("User not found");
-
         }
-        else res.send(err);}
-    })
-})
+
+        else res.send(err);
+    });
+});
+
 
 
 
